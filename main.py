@@ -269,7 +269,7 @@ def get_data_from_google_sheets():
         return None
 
 
-async def main(match, link, categories, username, password):
+async def main(link, categories, username, password):
     try:
         initial_link = 'https://euro2024-sales.tickets.uefa.com/'
         config = nodriver.Config(user_data_dir=None, headless=False, browser_executable_path=None, browser_args=None, sandbox=True, lang='en-US')
@@ -277,7 +277,7 @@ async def main(match, link, categories, username, password):
         driver = await uc.start(config=config)
         page = await driver.get('https://nopecha.com/setup#sub_1NnGb4CRwBwvt6ptDqqrDlul|keys=|enabled=true|disabled_hosts=|hcaptcha_auto_open=true|hcaptcha_auto_solve=true|hcaptcha_solve_delay=true|hcaptcha_solve_delay_time=3000|recaptcha_auto_open=true|recaptcha_auto_solve=true|recaptcha_solve_delay=true|recaptcha_solve_delay_time=1000|funcaptcha_auto_open=true|funcaptcha_auto_solve=true|funcaptcha_solve_delay=true|funcaptcha_solve_delay_time=0|awscaptcha_auto_open=true|awscaptcha_auto_solve=true|awscaptcha_solve_delay=true|awscaptcha_solve_delay_time=0|turnstile_auto_solve=true|turnstile_solve_delay=true|turnstile_solve_delay_time=1000|perimeterx_auto_solve=false|perimeterx_solve_delay=true|perimeterx_solve_delay_time=1000|textcaptcha_auto_solve=true|textcaptcha_solve_delay=true|textcaptcha_solve_delay_time=0|textcaptcha_image_selector=#img_captcha|textcaptcha_input_selector=#secret|recaptcha_solve_method=Image')
         page = await driver.get(initial_link)
-        input(f'\n{match} continue?')
+        input(f'\ncontinue?')
         while True:
             is_captcha = await custom_wait(page, '#root_content', timeout=10)
             if is_captcha:
@@ -402,22 +402,52 @@ async def main(match, link, categories, username, password):
 
 
 if __name__ == '__main__':
-    data = get_data_from_google_sheets()
+    # data = get_data_from_google_sheets()
     threads = []
-    for row in data:
-        match = row[0]
-        categories = {"Category 1": row[1], "Category 2": row[2], "Category 3": row[3], "Category 4": row[4]}
-        username = row[5]
-        password = row[6]
-        link = row[7]
-        print(match)
-        thread = threading.Thread(target=lambda: uc.loop().run_until_complete(main(match, link, categories, username, password)))
-        thread.start()
-        threads.append(thread)
+    matches = [
+    ["Hungary vs Switzerland", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753867/contact-advantages/10229302961043/lang/en"],
+    ["Slovenia vs Denmark", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753871/contact-advantages/10229302961043/lang/en"],
+    ["Austria vs France", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753872/contact-advantages/10229302961043/lang/en"],
+    ["Belgium vs Slovakia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753873/contact-advantages/10229302961043/lang/en"],
+    ["Romania vs Ukraine", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753874/contact-advantages/10229302961043/lang/en"],
+    ["Croatia vs Albania", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753875/contact-advantages/10229302961043/lang/en"],
+    ["Slovenia vs Serbia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753880/contact-advantages/10229302961043/lang/en"],
+    ["Poland vs Austria", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753883/contact-advantages/10229302961043/lang/en"],
+    ["Slovakia vs Ukraine", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753886/contact-advantages/10229302961043/lang/en"],
+    ["Belgium vs Romania", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753887/contact-advantages/10229302961043/lang/en"],
+    ["Georgia vs Czechia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753889/contact-advantages/10229302961043/lang/en"],
+    ["England vs Slovenia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753895/contact-advantages/10229302961043/lang/en"],
+    ["Denmark vs Serbia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753896/contact-advantages/10229302961043/lang/en"],
+    ["Netherlands vs Austria", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753897/contact-advantages/10229302961043/lang/en"],
+    ["France vs Poland", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753898/contact-advantages/10229302961043/lang/en"],
+    ["Slovakia vs Romania", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753899/contact-advantages/10229302961043/lang/en"],
+    ["Ukraine vs Belgium", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753900/contact-advantages/10229302961043/lang/en"],
+    ["2A vs 2B", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753904/contact-advantages/10229302961043/lang/en"],
+    ["1B vs 3A/D/E/F", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753905/contact-advantages/10229302961043/lang/en"],
+    ["1F vs 3A/B/C", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753907/contact-advantages/10229302961043/lang/en"],
+    ["2D vs 2E", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753908/contact-advantages/10229302961043/lang/en"],
+    ["1E vs 3A/B/C/D", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753909/contact-advantages/10229302961043/lang/en"],
+    ["W41 VS W42", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753912/contact-advantages/10229302961043/lang/en"],
+    ["W43 VS W44", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753913/contact-advantages/10229302961043/lang/en"]
+]
 
-        delay = random.uniform(5, 10)
-        time.sleep(delay)
-    for thread in threads:
-        thread.join()
-
+    
+    for index, match in enumerate(matches):
+        print(f"{index}: {match[0]}")
+    while True:
+        try:
+            match_index = int(input('Введіть індекс матча, який хочете обрати: '))
+            break
+        except: pass
+    
+    link = matches[match_index][1]
+    category1 = input('Category 1 (Або залиште порожнім): ')
+    category2 = input('Category 2 (Або залиште порожнім): ')
+    category3 = input('Category 3 (Або залиште порожнім): ')
+    category4 = input('Category 4 (Або залиште порожнім): ')
+    categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4}
+    username = input('username: ')
+    password = input('password: ')
+    print(link)
+    uc.loop().run_until_complete(main(link, categories, username, password))
     

@@ -193,7 +193,6 @@ async def wait_for_captcha(page, driver):
 
 
 async def custom_wait(page, selector, timeout=10):
-    print('in custom wait')
     for _ in range(0, timeout):
         try:
             element = await page.query_selector(selector)
@@ -269,7 +268,7 @@ def get_data_from_google_sheets():
         return None
 
 
-async def main(data, username, password):
+async def main(data, username=None, password=None, proxy=None):
     try:
         initial_link = 'https://euro2024-sales.tickets.uefa.com/'
         config = nodriver.Config(user_data_dir=None, headless=False, browser_executable_path=None, browser_args=None, sandbox=True, lang='en-US')
@@ -277,29 +276,42 @@ async def main(data, username, password):
         directory_name = 'NopeCha'
         slash = "\\" if sys.platform == "win32" else "/"
         extension = os.path.join(cwd, directory_name)
-        print(extension)
+        if proxy: 
+            clear_proxy = proxy.split(':')
+            clear_proxy[1] = int(clear_proxy[1])
+            proxy_path = ProxyExtension(*clear_proxy)
+            print(proxy_path)
+            config.add_extension(extension_path=proxy_path.directory)
+        print(proxy)
         config.add_extension(extension_path=extension)
         driver = await uc.start(config=config)
         page = await driver.get('https://nopecha.com/setup#sub_1NnGb4CRwBwvt6ptDqqrDlul|keys=|enabled=true|disabled_hosts=|hcaptcha_auto_open=true|hcaptcha_auto_solve=true|hcaptcha_solve_delay=true|hcaptcha_solve_delay_time=3000|recaptcha_auto_open=true|recaptcha_auto_solve=true|recaptcha_solve_delay=true|recaptcha_solve_delay_time=1000|funcaptcha_auto_open=true|funcaptcha_auto_solve=true|funcaptcha_solve_delay=true|funcaptcha_solve_delay_time=0|awscaptcha_auto_open=true|awscaptcha_auto_solve=true|awscaptcha_solve_delay=true|awscaptcha_solve_delay_time=0|turnstile_auto_solve=true|turnstile_solve_delay=true|turnstile_solve_delay_time=1000|perimeterx_auto_solve=false|perimeterx_solve_delay=true|perimeterx_solve_delay_time=1000|textcaptcha_auto_solve=true|textcaptcha_solve_delay=true|textcaptcha_solve_delay_time=0|textcaptcha_image_selector=#img_captcha|textcaptcha_input_selector=#secret|recaptcha_solve_method=Image')
         page = await driver.get(initial_link)
-        input(f'\ncontinue?')
+        input('continue?')
+        print(username, password)
         while True:
+            print('in while loop')
             is_captcha = await custom_wait(page, '#root_content', timeout=10)
             if is_captcha:
-                try:
-                    username_el = await page.query_selector('div.idp-static-page div.gigya-composite-control > input[name="username"]')
-                    for i in username:
-                        await username_el.send_keys(i)
-                        time.sleep(.1)
-                    password_el = await page.query_selector('div.idp-static-page div.gigya-composite-control > input[name="password"]')
-                    for i in password:
-                        await password_el.send_keys(i)
-                        time.sleep(.1)
-                    time.sleep(random.randint(1, 3))
-                    submit_el = await page.query_selector('div.idp-static-page div.gigya-composite-control > input[type="submit"]')
-                    await submit_el.mouse_click()
-                    time.sleep(2)
-                except: pass
+                if username and password:
+                    try:
+                        username_el = await page.query_selector('div.idp-static-page div.gigya-composite-control > input[name="username"]')
+                        await username_el.scroll_into_view()
+                        for i in username:
+                            await username_el.send_keys(i)
+                            time.sleep(.1)
+                        password_el = await page.query_selector('div.idp-static-page div.gigya-composite-control > input[name="password"]')
+                        await password_el.scroll_into_view()
+                        for i in password:
+                            await password_el.send_keys(i)
+                            time.sleep(.1)
+                        time.sleep(random.randint(1, 3))
+                        
+                        submit_el = await page.query_selector('div.idp-static-page div.gigya-composite-control > input[type="submit"]')
+                        await submit_el.scroll_into_view()
+                        await submit_el.mouse_click()
+                        time.sleep(2)
+                    except Exception as e: print(e)
             elif await custom_wait(page, 'form[id="form_captcha"]', timeout=5):
                 try:
                     print('waiting for captcha to resolve...')
@@ -308,9 +320,8 @@ async def main(data, username, password):
                     enter_button = await custom_wait(page, '#action > #actionButtonSpan', timeout=10)
                     if enter_button: await enter_button.click()
                     continue
-                except: pass
-            elif await custom_wait(page, '#main_content_account_home_personal_offers', timeout=5): break
-            print('no captcha and login')
+                except Exception as e: print(e)
+            elif await custom_wait(page, '#isolated_header_iframe', timeout=2): break
                 
         
 
@@ -372,7 +383,7 @@ async def main(data, username, password):
                         
                     if necessary_categories == []: 
                         print('No available tickets')
-                        time.sleep(random.randint(30, 60))
+                        time.sleep(random.randint(45, 60))
                         continue
                     random_category = random.choice(necessary_categories)
                     await random_category[0].scroll_into_view()
@@ -402,7 +413,7 @@ async def main(data, username, password):
                         sd.play(sound, fs)
                         status = sd.wait()
                         input('continue?')
-                    time.sleep(random.randint(30, 60))
+                    time.sleep(random.randint(45, 60))
             except Exception as e: print(e)
                 
     except Exception as e: 
@@ -473,6 +484,7 @@ if __name__ == '__main__':
     row_indexes= input('Indexes (separated by + symbol): ').split(' + ')
     username = input('username: ')
     password = input('password: ')
+    proxy = input('proxy: ')
     for row_index in row_indexes:
         print(matches[int(row_index)-1][0], "[НАЛАШТУВАННЯ]")
         link = matches[int(row_index)-1][1]
@@ -483,5 +495,5 @@ if __name__ == '__main__':
         categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4}
         data.append([link, categories])
     
-    uc.loop().run_until_complete(main(data, username, password))
+    uc.loop().run_until_complete(main(data, username, password, proxy))
     

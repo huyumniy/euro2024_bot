@@ -269,7 +269,7 @@ def get_data_from_google_sheets():
         return None
 
 
-async def main(link, categories, username, password):
+async def main(data, username, password):
     try:
         initial_link = 'https://euro2024-sales.tickets.uefa.com/'
         config = nodriver.Config(user_data_dir=None, headless=False, browser_executable_path=None, browser_args=None, sandbox=True, lang='en-US')
@@ -298,6 +298,7 @@ async def main(link, categories, username, password):
                     time.sleep(random.randint(1, 3))
                     submit_el = await page.query_selector('div.idp-static-page div.gigya-composite-control > input[type="submit"]')
                     await submit_el.mouse_click()
+                    time.sleep(2)
                 except: pass
             elif await custom_wait(page, 'form[id="form_captcha"]', timeout=5):
                 try:
@@ -341,64 +342,67 @@ async def main(link, categories, username, password):
             try:
                 necessary_categories = []
                 print('before page')
-                page = await driver.get(link)
-                print('after page')
-                await page.wait_for('#event_form')
-                table_elements = await page.query_selector_all('table > tbody > tr[data-conditionalrateid]')
-
-                is_empty_category = True
-                for value in categories.values():
-                    if value != '': is_empty_category = False
-
-                
-                for table_element in table_elements:
-                    category = await table_element.query_selector('th.category')
-                    if 'category_unavailable' in table_element.attrs['class_']: continue
-                    # print(category.text.strip().lower())
+                for match in data:
+                    link, categories = match
                     
-                    print(category.text.strip())
-                    # category_el = categories[category.text.strip()]
-                    
-                    if category.text.strip() in [category for category in categories.keys()]:
-                        # print(category)
-                        if not is_empty_category:
-                            if categories[category.text.strip()] != '':
-                                necessary_categories.append([table_element, categories[category.text.strip()]])
-                        # else: necessary_categories.append([table_element, 0])
-                    
-                if necessary_categories == []: 
-                    print('No available tickets')
-                    time.sleep(random.randint(20, 40))
-                    continue
-                random_category = random.choice(necessary_categories)
-                await random_category[0].scroll_into_view()
-                quantity_selector = await random_category[0].query_selector('td.quantity > select')
-                await quantity_selector.scroll_into_view()
-                await quantity_selector.click()
-                if random_category[1] != 0:
-                    option = await quantity_selector.query_selector(f'option[value="{str(random_category[1])}"]')
-                # else: option = await quantity_selector.query_selector(f'option[value="{str(random.randint(1, 4))}"]')
-                await option.scroll_into_view()
-                await option.select_option()
+                    page = await driver.get(link)
+                    print('after page')
+                    await page.wait_for('#event_form')
+                    table_elements = await page.query_selector_all('table > tbody > tr[data-conditionalrateid]')
 
-                book_button = await page.query_selector('#book')
-                await book_button.scroll_into_view()
-                await book_button.mouse_click()
+                    is_empty_category = True
+                    for value in categories.values():
+                        if value != '': is_empty_category = False
 
-                captcha_dialog = await custom_wait(page, 'div[aria-describedby="captcha_dialog"]', timeout=5)
-                if captcha_dialog: 
-                    continue_button = await captcha_dialog.query_selector('#captcha_dialog_continue_invisible')
-                    await continue_button.scroll_into_view()
-                    await continue_button.click()
-                    sucess = await custom_wait(page, 'section[class="message success "]', timeout=50)
-                else:
-                    sucess = await custom_wait(page, 'section[class="message success "]', timeout=10)
-                if sucess:
-                    data, fs = sf.read('notify.wav', dtype='float32')  
-                    sd.play(data, fs)
-                    status = sd.wait()
-                    input('continue?')
-                time.sleep(random.randint(20, 40))
+                    
+                    for table_element in table_elements:
+                        category = await table_element.query_selector('th.category')
+                        if 'category_unavailable' in table_element.attrs['class_']: continue
+                        # print(category.text.strip().lower())
+                        
+                        print(category.text.strip())
+                        # category_el = categories[category.text.strip()]
+                        
+                        if category.text.strip() in [category for category in categories.keys()]:
+                            # print(category)
+                            if not is_empty_category:
+                                if categories[category.text.strip()] != '':
+                                    necessary_categories.append([table_element, categories[category.text.strip()]])
+                            # else: necessary_categories.append([table_element, 0])
+                        
+                    if necessary_categories == []: 
+                        print('No available tickets')
+                        time.sleep(random.randint(30, 60))
+                        continue
+                    random_category = random.choice(necessary_categories)
+                    await random_category[0].scroll_into_view()
+                    quantity_selector = await random_category[0].query_selector('td.quantity > select')
+                    await quantity_selector.scroll_into_view()
+                    await quantity_selector.click()
+                    if random_category[1] != 0:
+                        option = await quantity_selector.query_selector(f'option[value="{str(random_category[1])}"]')
+                    # else: option = await quantity_selector.query_selector(f'option[value="{str(random.randint(1, 4))}"]')
+                    await option.scroll_into_view()
+                    await option.select_option()
+
+                    book_button = await page.query_selector('#book')
+                    await book_button.scroll_into_view()
+                    await book_button.mouse_click()
+
+                    captcha_dialog = await custom_wait(page, 'div[aria-describedby="captcha_dialog"]', timeout=5)
+                    if captcha_dialog: 
+                        continue_button = await captcha_dialog.query_selector('#captcha_dialog_continue_invisible')
+                        await continue_button.scroll_into_view()
+                        await continue_button.click()
+                        sucess = await custom_wait(page, 'section[class="message success "]', timeout=50)
+                    else:
+                        sucess = await custom_wait(page, 'section[class="message success "]', timeout=10)
+                    if sucess:
+                        sound, fs = sf.read('notify.wav', dtype='float32')  
+                        sd.play(sound, fs)
+                        status = sd.wait()
+                        input('continue?')
+                    time.sleep(random.randint(30, 60))
             except Exception as e: print(e)
                 
     except Exception as e: 
@@ -410,49 +414,74 @@ if __name__ == '__main__':
     # data = get_data_from_google_sheets()
     threads = []
     matches = [
+    ["Germany vs Scotland", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753866/contact-advantages/10229302961043/lang/en"],
     ["Hungary vs Switzerland", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753867/contact-advantages/10229302961043/lang/en"],
+    ["Spain vs Croatia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753868/contact-advantages/10229302961043/lang/en"],
+    ["Italy vs Albania", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753869/contact-advantages/10229302961043/lang/en"],
+    ["Serbia vs England", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753870/contact-advantages/10229302961043/lang/en"],
     ["Slovenia vs Denmark", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753871/contact-advantages/10229302961043/lang/en"],
-    ["Austria vs France", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753872/contact-advantages/10229302961043/lang/en"],
-    ["Belgium vs Slovakia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753873/contact-advantages/10229302961043/lang/en"],
-    ["Romania vs Ukraine", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753874/contact-advantages/10229302961043/lang/en"],
-    ["Croatia vs Albania", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753875/contact-advantages/10229302961043/lang/en"],
-    ["Slovenia vs Serbia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753880/contact-advantages/10229302961043/lang/en"],
-    ["Poland vs Austria", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753883/contact-advantages/10229302961043/lang/en"],
+    ["Poland vs Netherlands", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753872/contact-advantages/10229302961043/lang/en"],
+    ["Austria vs France", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753873/contact-advantages/10229302961043/lang/en"],
+    ["Belgium vs Slovakia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753874/contact-advantages/10229302961043/lang/en"],
+    ["Romania vs Ukraine", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753875/contact-advantages/10229302961043/lang/en"],
+    ["Turkey vs Georgia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753876/contact-advantages/10229302961043/lang/en"],
+    ["Portugal vs Czech Republic", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753877/contact-advantages/10229302961043/lang/en"],
+    ["Scotland vs Switzerland", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753878/contact-advantages/10229302961043/lang/en"],
+    ["Germany vs Hungary", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753879/contact-advantages/10229302961043/lang/en"],
+    ["Croatia vs Albania", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753880/contact-advantages/10229302961043/lang/en"],
+    ["Spain vs Italy", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753881/contact-advantages/10229302961043/lang/en"],
+    ["Denmark vs England", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753882/contact-advantages/10229302961043/lang/en"],
+    ["Slovenia vs Serbia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753883/contact-advantages/10229302961043/lang/en"],
+    ["Poland vs Austria", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753884/contact-advantages/10229302961043/lang/en"],
+    ["Netherlands vs France", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753885/contact-advantages/10229302961043/lang/en"],
     ["Slovakia vs Ukraine", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753886/contact-advantages/10229302961043/lang/en"],
     ["Belgium vs Romania", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753887/contact-advantages/10229302961043/lang/en"],
+    ["Turkey vs Portugal", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753888/contact-advantages/10229302961043/lang/en"],
     ["Georgia vs Czechia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753889/contact-advantages/10229302961043/lang/en"],
+    ["Switzerland vs Germany", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753890/contact-advantages/10229302961043/lang/en"],
+    ["Scotland vs Hungary", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753891/contact-advantages/10229302961043/lang/en"],
+    ["Albania vs Spain", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753892/contact-advantages/10229302961043/lang/en"],
+    ["Croatia vs Italy", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753893/contact-advantages/10229302961043/lang/en"],
     ["England vs Slovenia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753895/contact-advantages/10229302961043/lang/en"],
     ["Denmark vs Serbia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753896/contact-advantages/10229302961043/lang/en"],
     ["Netherlands vs Austria", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753897/contact-advantages/10229302961043/lang/en"],
     ["France vs Poland", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753898/contact-advantages/10229302961043/lang/en"],
     ["Slovakia vs Romania", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753899/contact-advantages/10229302961043/lang/en"],
     ["Ukraine vs Belgium", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753900/contact-advantages/10229302961043/lang/en"],
+    ["Georgia vs Portugal", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753901/contact-advantages/10229302961043/lang/en"],
+    ["Czech Republic vs Turkey", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753902/contact-advantages/10229302961043/lang/en"],
+    ["1A vs 2C", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753903/contact-advantages/10229302961043/lang/en"],
     ["2A vs 2B", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753904/contact-advantages/10229302961043/lang/en"],
     ["1B vs 3A/D/E/F", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753905/contact-advantages/10229302961043/lang/en"],
+    ["1C vs 3D/E/F", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753906/contact-advantages/10229302961043/lang/en"],
     ["1F vs 3A/B/C", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753907/contact-advantages/10229302961043/lang/en"],
     ["2D vs 2E", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753908/contact-advantages/10229302961043/lang/en"],
     ["1E vs 3A/B/C/D", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753909/contact-advantages/10229302961043/lang/en"],
-    ["W41 VS W42", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753912/contact-advantages/10229302961043/lang/en"],
-    ["W43 VS W44", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753913/contact-advantages/10229302961043/lang/en"]
+    ["W39 vs W37", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753910/contact-advantages/10229302961043/lang/en"],
+    ["W40 vs W38", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753911/contact-advantages/10229302961043/lang/en"],
+    ["W41 vs W42", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753912/contact-advantages/10229302961043/lang/en"],
+    ["W43 vs W44", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753913/contact-advantages/10229302961043/lang/en"],
+    ["W45 vs W46", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753914/contact-advantages/10229302961043/lang/en"],
+    ["W47 vs W48", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753915/contact-advantages/10229302961043/lang/en"],
+    ["W49 vs W50", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753916/contact-advantages/10229302961043/lang/en"]
 ]
 
     
-    for index, match in enumerate(matches):
+    for index, match in enumerate(matches, 1):
         print(f"{index}: {match[0]}")
-    while True:
-        try:
-            match_index = int(input('Введіть індекс матча, який хочете обрати: '))
-            break
-        except: pass
-    
-    link = matches[match_index][1]
-    category1 = input('Category 1 (Або залиште порожнім): ')
-    category2 = input('Category 2 (Або залиште порожнім): ')
-    category3 = input('Category 3 (Або залиште порожнім): ')
-    category4 = input('Category 4 (Або залиште порожнім): ')
-    categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4}
+    data = []
+    row_indexes= input('Indexes (separated by + symbol): ').split(' + ')
     username = input('username: ')
     password = input('password: ')
-    print(link)
-    uc.loop().run_until_complete(main(link, categories, username, password))
+    for row_index in row_indexes:
+        print(matches[int(row_index)-1][0], "[НАЛАШТУВАННЯ]")
+        link = matches[int(row_index)-1][1]
+        category1 = input('Category 1 (Або залиште порожнім): ')
+        category2 = input('Category 2 (Або залиште порожнім): ')
+        category3 = input('Category 3 (Або залиште порожнім): ')
+        category4 = input('Category 4 (Або залиште порожнім): ')
+        categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4}
+        data.append([link, categories])
+    
+    uc.loop().run_until_complete(main(data, username, password))
     

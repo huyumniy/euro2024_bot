@@ -139,7 +139,7 @@ async def wait_for_captcha(page, driver):
             # print(iframe_id)
             # el = await page.find('Ми хочемо переконатися, що це справді ви, а не робот.')
             # id =  await page.send(cdp.dom.perform_search('html'))
-            iframe = await page.select("iframe")
+            iframe = await custom_wait(page, "iframe")
             # Get required tab. Not safe in case when tab not found
             iframe_tab: uc.Tab = next(
                 filter(
@@ -287,6 +287,8 @@ async def main(data, username=None, password=None, proxy=None):
         driver = await uc.start(config=config)
         page = await driver.get('https://nopecha.com/setup#sub_1NnGb4CRwBwvt6ptDqqrDlul|keys=|enabled=true|disabled_hosts=|hcaptcha_auto_open=true|hcaptcha_auto_solve=true|hcaptcha_solve_delay=true|hcaptcha_solve_delay_time=3000|recaptcha_auto_open=true|recaptcha_auto_solve=true|recaptcha_solve_delay=true|recaptcha_solve_delay_time=1000|funcaptcha_auto_open=true|funcaptcha_auto_solve=true|funcaptcha_solve_delay=true|funcaptcha_solve_delay_time=0|awscaptcha_auto_open=true|awscaptcha_auto_solve=true|awscaptcha_solve_delay=true|awscaptcha_solve_delay_time=0|turnstile_auto_solve=true|turnstile_solve_delay=true|turnstile_solve_delay_time=1000|perimeterx_auto_solve=false|perimeterx_solve_delay=true|perimeterx_solve_delay_time=1000|textcaptcha_auto_solve=true|textcaptcha_solve_delay=true|textcaptcha_solve_delay_time=0|textcaptcha_image_selector=#img_captcha|textcaptcha_input_selector=#secret|recaptcha_solve_method=Image')
         page = await driver.get(initial_link)
+        # time.sleep(1)
+        # await wait_for_captcha(page, driver)
         input('continue?')
         print(username, password)
         while True:
@@ -418,7 +420,7 @@ async def main(data, username=None, password=None, proxy=None):
                 
     except Exception as e: 
         print(e)
-        time.sleep(30)
+        time.sleep(60)
 
 
 if __name__ == '__main__':
@@ -492,7 +494,8 @@ if __name__ == '__main__':
         category2 = input('Category 2 (Або залиште порожнім): ')
         category3 = input('Category 3 (Або залиште порожнім): ')
         category4 = input('Category 4 (Або залиште порожнім): ')
-        categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4}
+        fansFirst = input('Fans First (Або залиште порожнім): ')
+        categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4, "Fans First": fansFirst}
         data.append([link, categories])
     
     uc.loop().run_until_complete(main(data, username, password, proxy))

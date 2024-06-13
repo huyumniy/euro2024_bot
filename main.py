@@ -327,29 +327,29 @@ async def main(data, username=None, password=None, proxy=None):
                 
         
 
-        # await page.wait_for('#performance_container')
-        # ul_elements = await page.query_selector_all('ul[class="performances_group_container semantic-no-styling"]')
-        # necessary_matches = []
+        await page.wait_for('#performance_container')
+        ul_elements = await page.query_selector_all('ul[class="performances_group_container semantic-no-styling"]')
+        necessary_matches = []
         
-        # product_id = ''
-        # for ul_element in ul_elements:
-        #     lis = await ul_element.query_selector_all('li')
-        #     for li in lis:
-        #         li_details = await li.query_selector('div[class="perf_details"]')
-        #         availability_el = await li_details.query_selector('div[class="ticket_availability"] span[class="availability_bullet"]')
-        #         availability = availability_el.attrs['aria-label']
-        #         if availability == "Sold out": continue
-        #         li_teams = await li_details.query_selector_all('p > span > span[class="name"]')
-        #         match = li_teams[0].text + ' vs ' + li_teams[1].text
-        #         print(match, 'id', li.attrs['id'])
-        #         if match in matches: necessary_matches.append(li)
+        product_id = ''
+        for ul_element in ul_elements:
+            lis = await ul_element.query_selector_all('li')
+            for li in lis:
+                li_details = await li.query_selector('div[class="perf_details"]')
+                availability_el = await li_details.query_selector('div[class="ticket_availability"] span[class="availability_bullet"]')
+                availability = availability_el.attrs['aria-label']
+                if availability == "Sold out": continue
+                li_teams = await li_details.query_selector_all('p > span > span[class="name"]')
+                match = li_teams[0].text + ' vs ' + li_teams[1].text
+                print(match, 'id', li.attrs['id'])
+                if match in matches: necessary_matches.append(li)
         
-        # random_match = random.choice(necessary_matches)
-        # product_id = random_match.attrs['id']
-        # print(product_id)
+        random_match = random.choice(necessary_matches)
+        product_id = random_match.attrs['id']
+        print(product_id)
         
-        # await random_match.scroll_into_view()
-        # await random_match.mouse_click()
+        await random_match.scroll_into_view()
+        await random_match.mouse_click()
 
         while True:
             try:
@@ -360,7 +360,8 @@ async def main(data, username=None, password=None, proxy=None):
                     
                     page = await driver.get(link)
                     print('after page')
-                    await page.wait_for('#event_form')
+                    event_form = await custom_wait(page, '#event_form', timeout=60)
+                    if not event_form: continue
                     table_elements = await page.query_selector_all('table > tbody > tr[data-conditionalrateid]')
 
                     is_empty_category = True
@@ -428,9 +429,9 @@ if __name__ == '__main__':
     threads = []
     matches = [
     ["Germany vs Scotland", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753866/contact-advantages/10229302961043/lang/en"],
-    ["Hungary vs Switzerland", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753867/contact-advantages/10229302961043/lang/en"],
-    ["Spain vs Croatia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753868/contact-advantages/10229302961043/lang/en"],
-    ["Italy vs Albania", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753869/contact-advantages/10229302961043/lang/en"],
+    ["Hungary vs Switzerland", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753867/contact-advantages/10229292232616,10229307881153/lang/en"],
+    ["Spain vs Croatia", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753868/contact-advantages/10229292232616,10229307881153/lang/en"],
+    ["Italy vs Albania", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753869/contact-advantages/10229292232616,10229307881153/lang/en"],
     ["Serbia vs England", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753870/contact-advantages/10229302961043/lang/en"],
     ["Slovenia vs Denmark", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753871/contact-advantages/10229302961043/lang/en"],
     ["Poland vs Netherlands", "https://euro2024-sales.tickets.uefa.com/secure/selection/event/seat/performance/101810753872/contact-advantages/10229302961043/lang/en"],
@@ -495,7 +496,8 @@ if __name__ == '__main__':
         category3 = input('Category 3 (Або залиште порожнім): ')
         category4 = input('Category 4 (Або залиште порожнім): ')
         fansFirst = input('Fans First (Або залиште порожнім): ')
-        categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4, "Fans First": fansFirst}
+        primeSeats = input('Prime Seats (Або залиште порожнім): ')
+        categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4, "Fans First": fansFirst, "Prime Seats": primeSeats}
         data.append([link, categories])
     
     uc.loop().run_until_complete(main(data, username, password, proxy))

@@ -293,23 +293,34 @@ def post_request(data):
         print("POST request failed.")
 
 
-async def main(data, username=None, password=None, proxy=None):
+async def main(data, username=None, password=None, proxy=None, open_url=None):
     try:
         initial_link = 'https://euro2024-sales.tickets.uefa.com/'
-        config = nodriver.Config(user_data_dir=None, headless=False, browser_executable_path=None, browser_args=None, sandbox=True, lang='en-US')
         cwd= os.getcwd()
         directory_name = 'NopeCha'
         slash = "\\" if sys.platform == "win32" else "/"
         extension = os.path.join(cwd, directory_name)
+        host, port = None, None
+        if open_url:
+            resp = requests.get(open_url).json()
+            if resp["code"] != 0:
+                print(resp["msg"])
+                print("please check ads_id")
+                sys.exit()
+            host, port = resp['data']['ws']['selenium'].split(':')
+        if host or port: config = nodriver.Config(user_data_dir=None, headless=False, browser_executable_path=None, \
+        browser_args=None, sandbox=True, lang='en-US', host=host, port=int(port))
+        else: config = nodriver.Config(user_data_dir=None, headless=False, browser_executable_path=None,\
+        browser_args=None, sandbox=True, lang='en-US')
+        config.add_extension(extension_path=extension)
         if proxy: 
             clear_proxy = proxy.split(':')
             clear_proxy[1] = int(clear_proxy[1])
             proxy_path = ProxyExtension(*clear_proxy)
             print(proxy_path)
             config.add_extension(extension_path=proxy_path.directory)
-        print(proxy)
-        config.add_extension(extension_path=extension)
-        driver = await uc.start(config=config)
+        driver = await uc.Browser.create(config=config)
+        # print(uc.Browser.websocket_url)
         page = await driver.get('https://nopecha.com/setup#sub_1NnGb4CRwBwvt6ptDqqrDlul|keys=|enabled=true|disabled_hosts=|hcaptcha_auto_open=true|hcaptcha_auto_solve=true|hcaptcha_solve_delay=true|hcaptcha_solve_delay_time=3000|recaptcha_auto_open=true|recaptcha_auto_solve=true|recaptcha_solve_delay=true|recaptcha_solve_delay_time=1000|funcaptcha_auto_open=true|funcaptcha_auto_solve=true|funcaptcha_solve_delay=true|funcaptcha_solve_delay_time=0|awscaptcha_auto_open=true|awscaptcha_auto_solve=true|awscaptcha_solve_delay=true|awscaptcha_solve_delay_time=0|turnstile_auto_solve=true|turnstile_solve_delay=true|turnstile_solve_delay_time=1000|perimeterx_auto_solve=false|perimeterx_solve_delay=true|perimeterx_solve_delay_time=1000|textcaptcha_auto_solve=true|textcaptcha_solve_delay=true|textcaptcha_solve_delay_time=0|textcaptcha_image_selector=#img_captcha|textcaptcha_input_selector=#secret|recaptcha_solve_method=Image')
         page = await driver.get(initial_link)
         # time.sleep(1)
@@ -397,27 +408,30 @@ async def main(data, username=None, password=None, proxy=None):
                     if availability == "Sold out": continue
                     li_teams = await li_details.query_selector_all('p > span > span[class="name"]')
                     match = li_teams[0].text + ' vs ' + li_teams[1].text
-                    if match in matches: necessary_matches.append(li)
+                    if match in matches: necessary_matches.append({match: li})
                     
             if len(necessary_matches) == 0:
                 print('No available match')
                 time.sleep(random.randint(45,60))
                 continue
             random_match = random.choice(necessary_matches)
-            
-            await random_match.scroll_into_view()
-            await random_match.mouse_click()
+            random_match_key, random_match_value = None, None
+            for match_key, match_value in random_match.items():
+                random_match_value = match_value
+                random_match_key = match_key
+            await random_match_value.scroll_into_view()
+            await random_match_value.mouse_click()
             break
-
+        categories = None
+        for i in data:
+            print(i[0], random_match_key)
+            if i[0] == random_match_key: categories = i[1]
+        print(categories)
         while True:
             try:
                 necessary_categories = []
-                print('before page')
-                print(data[0][1])
-                categories = data[0][1]
                 await driver.get()
                 await page.back()
-                print('after page')
                 event_form = await custom_wait(page, '#event_form', timeout=60)
                 if not event_form: continue
                 table_elements = await page.query_selector_all('table > tbody > tr[data-conditionalrateid]')
@@ -459,8 +473,9 @@ async def main(data, username=None, password=None, proxy=None):
                 book_button = await page.query_selector('#book')
                 await book_button.scroll_into_view()
                 await book_button.mouse_click()
-
+                sucess = None
                 captcha_dialog = await custom_wait(page, 'div[aria-describedby="captcha_dialog"]', timeout=5)
+                # print(captcha_dialog.attrs('class_'))
                 if captcha_dialog: 
                     continue_button = await captcha_dialog.query_selector('#captcha_dialog_continue_invisible')
                     await continue_button.scroll_into_view()
@@ -489,6 +504,11 @@ async def main(data, username=None, password=None, proxy=None):
                     try: post_request(data_to_post)
                     except: pass
                     input('continue?')
+                    await page.back()
+                if random_category[1] != 0:
+                    option = await quantity_selector.query_selector(f'option[value="0"]')
+                    await option.scroll_into_view()
+                    await option.select_option()
                 time.sleep(random.randint(45, 60))
             except Exception as e: 
                 print(e)
@@ -503,77 +523,102 @@ if __name__ == '__main__':
     # data = get_data_from_google_sheets()
     threads = []
     matches = [
-    ["Germany vs Scotland"],
-    ["Hungary vs Switzerland"],
-    ["Spain vs Croatia"],
-    ["Italy vs Albania"],
-    ["Serbia vs England"],
-    ["Slovenia vs Denmark"],
-    ["Poland vs Netherlands"],
-    ["Austria vs France"],
-    ["Belgium vs Slovakia"],
-    ["Romania vs Ukraine"],
-    ["Turkey vs Georgia"],
-    ["Portugal vs Czech Republic"],
-    ["Scotland vs Switzerland"],
-    ["Germany vs Hungary"],
-    ["Croatia vs Albania"],
-    ["Spain vs Italy"],
-    ["Denmark vs England"],
-    ["Slovenia vs Serbia"],
-    ["Poland vs Austria"],
-    ["Netherlands vs France"],
-    ["Slovakia vs Ukraine"],
-    ["Belgium vs Romania"],
-    ["Turkey vs Portugal"],
-    ["Georgia vs Czechia"],
-    ["Switzerland vs Germany"],
-    ["Scotland vs Hungary"],
-    ["Albania vs Spain"],
-    ["Croatia vs Italy"],
-    ["England vs Slovenia"],
-    ["Denmark vs Serbia"],
-    ["Netherlands vs Austria"],
-    ["France vs Poland"],
-    ["Slovakia vs Romania"],
-    ["Ukraine vs Belgium"],
-    ["Georgia vs Portugal"],
-    ["Czech Republic vs Turkey"],
-    ["1A vs 2C"],
-    ["2A vs 2B"],
-    ["1B vs 3A/D/E/F"],
-    ["1C vs 3D/E/F"],
-    ["1F vs 3A/B/C"],
-    ["2D vs 2E"],
-    ["1E vs 3A/B/C/D"],
-    ["W39 vs W37"],
-    ["W40 vs W38"],
-    ["W41 vs W42"],
-    ["W43 vs W44"],
-    ["W45 vs W46"],
-    ["W47 vs W48"],
-    ["W49 vs W50"]
-]
-
+        ["Germany vs Scotland"],
+        ["Hungary vs Switzerland"],
+        ["Spain vs Croatia"],
+        ["Italy vs Albania"],
+        ["Serbia vs England"],
+        ["Slovenia vs Denmark"],
+        ["Poland vs Netherlands"],
+        ["Austria vs France"],
+        ["Belgium vs Slovakia"],
+        ["Romania vs Ukraine"],
+        ["Turkey vs Georgia"],
+        ["Portugal vs Czech Republic"],
+        ["Scotland vs Switzerland"],
+        ["Germany vs Hungary"],
+        ["Croatia vs Albania"],
+        ["Spain vs Italy"],
+        ["Denmark vs England"],
+        ["Slovenia vs Serbia"],
+        ["Poland vs Austria"],
+        ["Netherlands vs France"],
+        ["Slovakia vs Ukraine"],
+        ["Belgium vs Romania"],
+        ["Turkey vs Portugal"],
+        ["Georgia vs Czechia"],
+        ["Switzerland vs Germany"],
+        ["Scotland vs Hungary"],
+        ["Albania vs Spain"],
+        ["Croatia vs Italy"],
+        ["England vs Slovenia"],
+        ["Denmark vs Serbia"],
+        ["Netherlands vs Austria"],
+        ["France vs Poland"],
+        ["Slovakia vs Romania"],
+        ["Ukraine vs Belgium"],
+        ["Georgia vs Portugal"],
+        ["Czech Republic vs Turkey"],
+        ["1A vs 2C"],
+        ["2A vs 2B"],
+        ["1B vs 3A/D/E/F"],
+        ["1C vs 3D/E/F"],
+        ["1F vs 3A/B/C"],
+        ["2D vs 2E"],
+        ["1E vs 3A/B/C/D"],
+        ["W39 vs W37"],
+        ["W40 vs W38"],
+        ["W41 vs W42"],
+        ["W43 vs W44"],
+        ["W45 vs W46"],
+        ["W47 vs W48"],
+        ["W49 vs W50"]
+    ]
     
     for index, match in enumerate(matches, 1):
         print(f"{index}: {match[0]}")
     data = []
-    row_indexes= input('Index: ').split(' + ')
-    username = input('username: ')
-    password = input('password: ')
-    proxy = input('proxy: ')
-    for row_index in row_indexes:
-        match = matches[int(row_index)-1][0]
-        print(match, "[НАЛАШТУВАННЯ]")
-        category1 = input('Category 1 (Або залиште порожнім): ')
-        category2 = input('Category 2 (Або залиште порожнім): ')
-        category3 = input('Category 3 (Або залиште порожнім): ')
-        category4 = input('Category 4 (Або залиште порожнім): ')
-        fansFirst = input('Fans First (Або залиште порожнім): ')
-        primeSeats = input('Prime Seats (Або залиште порожнім): ')
-        categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4, "Fans First": fansFirst, "Prime Seats": primeSeats}
-        data.append([match, categories])
+    row_indexes= input('Indexes (separated by + symbol): ').strip().split('+')
 
-    uc.loop().run_until_complete(main(data, username, password, proxy))
-    
+    while True:
+        is_adspower = input('use adspower? [ yes / no ]: ')
+        if is_adspower.lower().strip() in ['yes', 'no']:
+            if is_adspower.lower().strip() == 'yes':
+                adspower = input('adspower api: ')
+                adspower_id = input('adspower id: ')
+                adspower_link = adspower + '/api/v1/browser/start?user_id=' + adspower_id
+                print(adspower_link)
+                username = input('username: ')
+                password = input('password: ')
+                proxy = None
+                for row_index in row_indexes:
+                    match = matches[int(row_index)-1][0]
+                    print(match, "[НАЛАШТУВАННЯ]")
+                    category1 = input('Category 1 (Або залиште порожнім): ')
+                    category2 = input('Category 2 (Або залиште порожнім): ')
+                    category3 = input('Category 3 (Або залиште порожнім): ')
+                    category4 = input('Category 4 (Або залиште порожнім): ')
+                    fansFirst = input('Fans First (Або залиште порожнім): ')
+                    primeSeats = input('Prime Seats (Або залиште порожнім): ')
+                    categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4, "Fans First": fansFirst, "Prime Seats": primeSeats}
+                    data.append([match, categories])
+
+            else:
+                username = input('username: ')
+                password = input('password: ')
+                proxy = input('proxy: ')
+                adspower_link = None
+                for row_index in row_indexes:
+                    match = matches[int(row_index)-1][0]
+                    print(match, "[НАЛАШТУВАННЯ]")
+                    category1 = input('Category 1 (Або залиште порожнім): ')
+                    category2 = input('Category 2 (Або залиште порожнім): ')
+                    category3 = input('Category 3 (Або залиште порожнім): ')
+                    category4 = input('Category 4 (Або залиште порожнім): ')
+                    fansFirst = input('Fans First (Або залиште порожнім): ')
+                    primeSeats = input('Prime Seats (Або залиште порожнім): ')
+                    categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4, "Fans First": fansFirst, "Prime Seats": primeSeats}
+                    data.append([match, categories])
+            uc.loop().run_until_complete(main(data, username, password, proxy, open_url=adspower_link))
+        else:
+            print('Введіть 1 з запропонованих варіантів [ yes / no ]')

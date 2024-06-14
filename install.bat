@@ -1,6 +1,6 @@
 @echo off
 
-set "project_dir=..\euro2024_bot-manual"
+set "project_dir=..\euro2024_bot-manual-menu"
 set "venv_dir=%project_dir%"
 
 rem Create virtual environment

@@ -293,6 +293,16 @@ def post_request(data):
         print("POST request failed.")
 
 
+def parse_random_category(value):
+    if value == '':
+        return ['']
+    elif '-' in value:
+        return list(map(int, value.split('-')))
+    else:
+        return [int(value)]
+
+
+
 async def main(data, username=None, password=None, proxy=None, open_url=None):
     try:
         initial_link = 'https://euro2024-sales.tickets.uefa.com/'
@@ -445,6 +455,8 @@ async def main(data, username=None, password=None, proxy=None, open_url=None):
                     category = await table_element.query_selector('th.category')
                     if not category: continue
                     if 'category_unavailable' in table_element.attrs['class_']: continue
+                    is_available = await table_element.query_selector('td.quantity > select')
+                    if not is_available: continue
                     # print(category.text.strip().lower())
                     print(category.text.strip())
                     # category_el = categories[category.text.strip()]
@@ -459,27 +471,63 @@ async def main(data, username=None, password=None, proxy=None, open_url=None):
                     print('No available tickets')
                     time.sleep(random.randint(45, 60))
                     continue
-                random_category = random.choice(necessary_categories)
-                await random_category[0].scroll_into_view()
-                quantity_selector = await random_category[0].query_selector('td.quantity > select')
-                await quantity_selector.scroll_into_view()
-                await quantity_selector.click()
-                if random_category[1] != 0:
-                    option = await quantity_selector.query_selector(f'option[value="{str(random_category[1])}"]')
-                # else: option = await quantity_selector.query_selector(f'option[value="{str(random.randint(1, 4))}"]')
+                while necessary_categories:
+                    random_category = random.choice(necessary_categories)
+                    await random_category[0].scroll_into_view()
+                    quantity_selector = await random_category[0].query_selector('td.quantity > select')
+                    await quantity_selector.scroll_into_view()
+                    await quantity_selector.click()
+
+                    parsed_values = parse_random_category(random_category[1])
+                    option = None
+                    
+                    if parsed_values:
+                        if len(parsed_values) > 1:  # This means we have a range
+                            min_value = parsed_values[0]
+                            max_value = parsed_values[1]
+                            
+                            options_len_element = await quantity_selector.query_selector_all('option')
+                            options_len = len(options_len_element) - 1
+                            if min_value <= options_len <= max_value:
+                                option = await quantity_selector.query_selector(f'option[value="{str(options_len)}"]')
+                            elif options_len >= max_value:
+                                option = await quantity_selector.query_selector(f'option[value="{str(max_value)}"]')
+                        else:  # Single digit case
+                            single_value = parsed_values[0]
+                            
+                            if single_value != 0:
+                                option = await quantity_selector.query_selector(f'option[value="{str(single_value)}"]')
+
+                    if option:
+                        # Break out of the loop if a valid option is found
+                        break
+                    else:
+                        # Remove the current category from the list
+                        necessary_categories.remove(random_category)
+                        print('Not enough tickets in category. Trying another category.')
+                        
+                        if not necessary_categories:
+                            # If no more categories are left, wait and then continue
+                            print('No more categories left. Waiting before retrying.')
+                            time.sleep(random.randint(45, 60))
                 await option.scroll_into_view()
                 await option.select_option()
-
+                
                 book_button = await page.query_selector('#book')
                 await book_button.scroll_into_view()
                 await book_button.mouse_click()
                 sucess = None
+
                 captcha_dialog = await custom_wait(page, 'div[aria-describedby="captcha_dialog"]', timeout=5)
                 # print(captcha_dialog.attrs('class_'))
                 if captcha_dialog: 
-                    continue_button = await captcha_dialog.query_selector('#captcha_dialog_continue_invisible')
+                    print('before continue_butotn')
+                    continue_button = await custom_wait(captcha_dialog, '#captcha_dialog_continue_invisible', timeout=1)
+                    print(continue_button)
+                    print('after that')
                     await continue_button.scroll_into_view()
-                    await continue_button.click()
+                    await continue_button.mouse_move()
+                    await continue_button.mouse_click()
                     sucess = await custom_wait(page, 'section[class="message success "]', timeout=50)
                 else:
                     sucess = await custom_wait(page, 'section[class="message success "]', timeout=10)
@@ -517,6 +565,45 @@ async def main(data, username=None, password=None, proxy=None, open_url=None):
     except Exception as e: 
         print(e)
         time.sleep(60)
+
+
+def is_valid_category_input(value):
+    if value == '':
+        return True
+    elif re.match(r'^[1-4]$', value):
+        return True
+    elif re.match(r'^[1-4]-[1-4]$', value):
+        start, end = map(int, value.split('-'))
+        return start < end
+    return False
+
+
+def get_valid_input(prompt):
+    while True:
+        value = input(prompt).strip()
+        if is_valid_category_input(value):
+            return value
+        print("Неправильне введення. Будь ласка, введіть одну цифру (1-4), діапазон (наприклад, 1-4) або залиште порожнім.")
+
+
+def gather_inputs():
+    username = input('username: ').strip()
+    password = input('password: ').strip()
+    proxy = input('proxy: ').strip() if not adspower_link else None
+    data = []
+    for row_index in row_indexes:
+        match = matches[int(row_index)-1][0]
+        print(match, "[НАЛАШТУВАННЯ]")
+        categories = {
+            "Category 1": get_valid_input('Category 1 (Або залиште порожнім): '),
+            "Category 2": get_valid_input('Category 2 (Або залиште порожнім): '),
+            "Category 3": get_valid_input('Category 3 (Або залиште порожнім): '),
+            "Category 4": get_valid_input('Category 4 (Або залиште порожнім): '),
+            "Fans First": get_valid_input('Fans First (Або залиште порожнім): '),
+            "Prime Seats": get_valid_input('Prime Seats (Або залиште порожнім): ')
+        }
+        data.append([match, categories])
+    return data, username, password, proxy
 
 
 if __name__ == '__main__':
@@ -580,45 +667,18 @@ if __name__ == '__main__':
     data = []
     row_indexes= input('Indexes (separated by + symbol): ').strip().split('+')
 
-    while True:
-        is_adspower = input('use adspower? [ yes / no ]: ')
-        if is_adspower.lower().strip() in ['yes', 'no']:
-            if is_adspower.lower().strip() == 'yes':
-                adspower = input('adspower api: ')
-                adspower_id = input('adspower id: ')
-                adspower_link = adspower + '/api/v1/browser/start?user_id=' + adspower_id
-                print(adspower_link)
-                username = input('username: ')
-                password = input('password: ')
-                proxy = None
-                for row_index in row_indexes:
-                    match = matches[int(row_index)-1][0]
-                    print(match, "[НАЛАШТУВАННЯ]")
-                    category1 = input('Category 1 (Або залиште порожнім): ')
-                    category2 = input('Category 2 (Або залиште порожнім): ')
-                    category3 = input('Category 3 (Або залиште порожнім): ')
-                    category4 = input('Category 4 (Або залиште порожнім): ')
-                    fansFirst = input('Fans First (Або залиште порожнім): ')
-                    primeSeats = input('Prime Seats (Або залиште порожнім): ')
-                    categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4, "Fans First": fansFirst, "Prime Seats": primeSeats}
-                    data.append([match, categories])
 
-            else:
-                username = input('username: ')
-                password = input('password: ')
-                proxy = input('proxy: ')
-                adspower_link = None
-                for row_index in row_indexes:
-                    match = matches[int(row_index)-1][0]
-                    print(match, "[НАЛАШТУВАННЯ]")
-                    category1 = input('Category 1 (Або залиште порожнім): ')
-                    category2 = input('Category 2 (Або залиште порожнім): ')
-                    category3 = input('Category 3 (Або залиште порожнім): ')
-                    category4 = input('Category 4 (Або залиште порожнім): ')
-                    fansFirst = input('Fans First (Або залиште порожнім): ')
-                    primeSeats = input('Prime Seats (Або залиште порожнім): ')
-                    categories = {"Category 1": category1, "Category 2": category2, "Category 3": category3, "Category 4": category4, "Fans First": fansFirst, "Prime Seats": primeSeats}
-                    data.append([match, categories])
+    while True:
+        is_adspower = input('use adspower? [ yes / no ]: ').strip().lower()
+        if is_adspower in ['yes', 'no']:
+            adspower_link = None
+            if is_adspower == 'yes':
+                adspower = input('adspower api: ').strip()
+                adspower_id = input('adspower id: ').strip()
+                adspower_link = f"{adspower}/api/v1/browser/start?user_id={adspower_id}"
+                print(adspower_link)
+            
+            data, username, password, proxy = gather_inputs()
             uc.loop().run_until_complete(main(data, username, password, proxy, open_url=adspower_link))
         else:
             print('Введіть 1 з запропонованих варіантів [ yes / no ]')

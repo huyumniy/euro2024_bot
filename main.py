@@ -450,23 +450,34 @@ async def main(data, username=None, password=None, proxy=None, open_url=None):
                 for value in categories.values():
                     if value != '': is_empty_category = False
 
-                
-                for table_element in table_elements:
-                    category = await table_element.query_selector('th.category')
+                last_seen_cat = None
+                for index in range(0, len(table_elements)):
+                    table_element = table_elements[index]
+                    category = await table_element.query_selector('.category')
+                    if category.text.strip(): last_seen_cat = table_element
                     if not category: continue
+                    category_text = ''
+                    if category.tag_name == 'td': 
+                        category_text = last_seen_cat.text.strip()
+                        print(category_text)
                     if 'category_unavailable' in table_element.attrs['class_']: continue
                     is_available = await table_element.query_selector('td.quantity > select')
                     if not is_available: continue
                     # print(category.text.strip().lower())
                     print(category.text.strip())
                     # category_el = categories[category.text.strip()]
-                    
-                    if category.text.strip() in [category for category in categories.keys()]:
-                        # print(category)
-                        if not is_empty_category:
-                            if categories[category.text.strip()] != '':
-                                necessary_categories.append([table_element, categories[category.text.strip()]])
-                        # else: necessary_categories.append([table_element, 0])
+                    if not category_text:
+                        if category.text.strip() in [category for category in categories.keys()]:
+                            # print(category)
+                            if not is_empty_category:
+                                if categories[category.text.strip()] != '':
+                                    necessary_categories.append([table_element, categories[category.text.strip()]])
+                            # else: necessary_categories.append([table_element, 0])
+                    else:
+                        if category_text in [category for category in categories.keys()]:
+                            if not is_empty_category:
+                                if categories[category_text] != '':
+                                    necessary_categories.append([table_element, categories[category_text]])
                 if necessary_categories == []: 
                     print('No available tickets')
                     time.sleep(random.randint(45, 60))
@@ -521,10 +532,7 @@ async def main(data, username=None, password=None, proxy=None, open_url=None):
                 captcha_dialog = await custom_wait(page, 'div[aria-describedby="captcha_dialog"]', timeout=5)
                 # print(captcha_dialog.attrs('class_'))
                 if captcha_dialog: 
-                    print('before continue_butotn')
                     continue_button = await custom_wait(captcha_dialog, '#captcha_dialog_continue_invisible', timeout=1)
-                    print(continue_button)
-                    print('after that')
                     await continue_button.scroll_into_view()
                     await continue_button.mouse_move()
                     await continue_button.mouse_click()
@@ -594,14 +602,22 @@ def gather_inputs():
     for row_index in row_indexes:
         match = matches[int(row_index)-1][0]
         print(match, "[НАЛАШТУВАННЯ]")
-        categories = {
-            "Category 1": get_valid_input('Category 1 (Або залиште порожнім): '),
-            "Category 2": get_valid_input('Category 2 (Або залиште порожнім): '),
-            "Category 3": get_valid_input('Category 3 (Або залиште порожнім): '),
-            "Category 4": get_valid_input('Category 4 (Або залиште порожнім): '),
-            "Fans First": get_valid_input('Fans First (Або залиште порожнім): '),
-            "Prime Seats": get_valid_input('Prime Seats (Або залиште порожнім): ')
-        }
+
+        categories = {}
+        for i in range(1, 5):
+            category_value = get_valid_input(f'Category {i} (Або залиште порожнім): ')
+            categories[f"Category {i}"] = category_value
+        
+        if input('Використати такі самі значення для Restricted View категорій? [yes/no]: ').strip().lower() == 'yes':
+            for i in range(1, 5):
+                categories[f"Cat. {i} Restricted View"] = categories[f"Category {i}"]
+        else:
+            for i in range(1, 5):
+                categories[f"Cat. {i} Restricted View"] = get_valid_input(f'Cat. {i} Restricted View (Або залиште порожнім): ')
+
+        categories["Fans First"] = get_valid_input('Fans First (Або залиште порожнім): ')
+        categories["Prime Seats"] = get_valid_input('Prime Seats (Або залиште порожнім): ')
+
         data.append([match, categories])
     return data, username, password, proxy
 

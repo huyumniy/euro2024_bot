@@ -303,7 +303,7 @@ def parse_random_category(value):
 
 
 
-async def main(data, username=None, password=None, proxy=None, open_url=None):
+async def main(data, reload_time, username=None, password=None, proxy=None, open_url=None):
     try:
         initial_link = 'https://euro2024-sales.tickets.uefa.com/'
         cwd= os.getcwd()
@@ -422,7 +422,7 @@ async def main(data, username=None, password=None, proxy=None, open_url=None):
                     
             if len(necessary_matches) == 0:
                 print('No available match')
-                time.sleep(random.randint(45,60))
+                time.sleep(random.randint(reload_time[0], reload_time[1]))
                 continue
             random_match = random.choice(necessary_matches)
             random_match_key, random_match_value = None, None
@@ -480,15 +480,16 @@ async def main(data, username=None, password=None, proxy=None, open_url=None):
                                     necessary_categories.append([table_element, categories[category_text]])
                 if necessary_categories == []: 
                     print('No available tickets')
-                    time.sleep(random.randint(45, 60))
+                    time.sleep(random.randint(reload_time[0], reload_time[1]))
                     continue
+                print('AFTER ALL THE SHIT')
                 while necessary_categories:
                     random_category = random.choice(necessary_categories)
+                    print(random_category)
                     await random_category[0].scroll_into_view()
                     quantity_selector = await random_category[0].query_selector('td.quantity > select')
                     await quantity_selector.scroll_into_view()
                     await quantity_selector.click()
-
                     parsed_values = parse_random_category(random_category[1])
                     option = None
                     
@@ -520,7 +521,7 @@ async def main(data, username=None, password=None, proxy=None, open_url=None):
                         if not necessary_categories:
                             # If no more categories are left, wait and then continue
                             print('No more categories left. Waiting before retrying.')
-                            time.sleep(random.randint(45, 60))
+                            time.sleep(random.randint(reload_time[0], reload_time[1]))
                 await option.scroll_into_view()
                 await option.select_option()
                 
@@ -565,7 +566,7 @@ async def main(data, username=None, password=None, proxy=None, open_url=None):
                     option = await quantity_selector.query_selector(f'option[value="0"]')
                     await option.scroll_into_view()
                     await option.select_option()
-                time.sleep(random.randint(45, 60))
+                time.sleep(random.randint(reload_time[0], reload_time[1]))
             except Exception as e: 
                 print(e)
                 time.sleep(60)
@@ -586,18 +587,37 @@ def is_valid_category_input(value):
     return False
 
 
-def get_valid_input(prompt):
+def is_valid_reload_time(value):
+    if value == '':
+        return True
+    elif re.match(r'^\d+-\d+$', value):
+        start, end = map(int, value.split('-'))
+        return start < end
+    return False
+
+
+def get_valid_input(prompt, validation_func, default=''):
     while True:
         value = input(prompt).strip()
-        if is_valid_category_input(value):
-            return value
+        if validation_func(value):
+            return value if value else default
         print("Неправильне введення. Будь ласка, введіть одну цифру (1-4), діапазон (наприклад, 1-4) або залиште порожнім.")
+
+
+def parse_reload_time(value):
+    if value:
+        start, end = map(int, value.split('-'))
+        return [start, end]
+    return [45, 60]
 
 
 def gather_inputs():
     username = input('username: ').strip()
     password = input('password: ').strip()
     proxy = input('proxy: ').strip() if not adspower_link else None
+    reload_time_input = get_valid_input('Reload time (Або залиште порожнім для [45, 60]): ', is_valid_reload_time, '45-60')
+    reload_time = parse_reload_time(reload_time_input)
+    
     data = []
     for row_index in row_indexes:
         match = matches[int(row_index)-1][0]
@@ -605,21 +625,21 @@ def gather_inputs():
 
         categories = {}
         for i in range(1, 5):
-            category_value = get_valid_input(f'Category {i} (Або залиште порожнім): ')
+            category_value = get_valid_input(f'Category {i} (Або залиште порожнім): ', is_valid_category_input)
             categories[f"Category {i}"] = category_value
         
-        if input('Використати такі самі значення для Restricted View категорій? [yes/no]: ').strip().lower() == 'yes':
+        if input('Use same values for Restricted View categories? [yes/no]: ').strip().lower() == 'yes':
             for i in range(1, 5):
                 categories[f"Cat. {i} Restricted View"] = categories[f"Category {i}"]
         else:
             for i in range(1, 5):
-                categories[f"Cat. {i} Restricted View"] = get_valid_input(f'Cat. {i} Restricted View (Або залиште порожнім): ')
+                categories[f"Cat. {i} Restricted View"] = get_valid_input(f'Cat. {i} Restricted View (Або залиште порожнім): ', is_valid_category_input)
 
-        categories["Fans First"] = get_valid_input('Fans First (Або залиште порожнім): ')
-        categories["Prime Seats"] = get_valid_input('Prime Seats (Або залиште порожнім): ')
+        categories["Fans First"] = get_valid_input('Fans First (Або залиште порожнім): ', is_valid_category_input)
+        categories["Prime Seats"] = get_valid_input('Prime Seats (Або залиште порожнім): ', is_valid_category_input)
 
         data.append([match, categories])
-    return data, username, password, proxy
+    return data, username, password, proxy, reload_time
 
 
 if __name__ == '__main__':
@@ -693,8 +713,8 @@ if __name__ == '__main__':
                 adspower_id = input('adspower id: ').strip()
                 adspower_link = f"{adspower}/api/v1/browser/start?user_id={adspower_id}"
                 print(adspower_link)
-            
-            data, username, password, proxy = gather_inputs()
-            uc.loop().run_until_complete(main(data, username, password, proxy, open_url=adspower_link))
+
+            data, username, password, proxy, reload_time = gather_inputs()
+            uc.loop().run_until_complete(main(data, reload_time, username, password, proxy, open_url=adspower_link))
         else:
             print('Введіть 1 з запропонованих варіантів [ yes / no ]')

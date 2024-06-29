@@ -25,6 +25,105 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from asyncio import iscoroutine, iscoroutinefunction
+import logging
+import json
+import asyncio
+import itertools
+
+logger = logging.getLogger("uc.connection")
+
+async def listener_loop(self):
+    while True:
+        try:
+            msg = await asyncio.wait_for(
+                self.connection.websocket.recv(), self.time_before_considered_idle
+            )
+        except asyncio.TimeoutError:
+            self.idle.set()
+            # breathe
+            # await asyncio.sleep(self.time_before_considered_idle / 10)
+            continue
+        except (Exception,) as e:
+            # break on any other exception
+            # which is mostly socket is closed or does not exist
+            # or is not allowed
+
+            logger.debug(
+                "connection listener exception while reading websocket:\n%s", e
+            )
+            break
+
+        if not self.running:
+            # if we have been cancelled or otherwise stopped running
+            # break this loop
+            break
+
+        # since we are at this point, we are not "idle" anymore.
+        self.idle.clear()
+
+        message = json.loads(msg)
+        if "id" in message:
+            # response to our command
+            if message["id"] in self.connection.mapper:
+                # get the corresponding Transaction
+                tx = self.connection.mapper[message["id"]]
+                logger.debug("got answer for %s", tx)
+                # complete the transaction, which is a Future object
+                # and thus will return to anyone awaiting it.
+                tx(**message)
+                self.connection.mapper.pop(message["id"])
+        else:
+            # probably an event
+            try:
+                event = cdp.util.parse_json_event(message)
+                event_tx = uc.connection.EventTransaction(event)
+                if not self.connection.mapper:
+                    self.connection.__count__ = itertools.count(0)
+                event_tx.id = next(self.connection.__count__)
+                self.connection.mapper[event_tx.id] = event_tx
+            except Exception as e:
+                logger.info(
+                    "%s: %s  during parsing of json from event : %s"
+                    % (type(e).__name__, e.args, message),
+                    exc_info=True,
+                )
+                continue
+            except KeyError as e:
+                logger.info("some lousy KeyError %s" % e, exc_info=True)
+                continue
+            try:
+                if type(event) in self.connection.handlers:
+                    callbacks = self.connection.handlers[type(event)]
+                else:
+                    continue
+                if not len(callbacks):
+                    continue
+                for callback in callbacks:
+                    try:
+                        if iscoroutinefunction(callback) or iscoroutine(callback):
+                            await callback(event)
+                        else:
+                            callback(event)
+                    except Exception as e:
+                        logger.warning(
+                            "exception in callback %s for event %s => %s",
+                            callback,
+                            event.__class__.__name__,
+                            e,
+                            exc_info=True,
+                        )
+                        raise
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                raise
+            continue
+        
+#call this after imported nodriver
+#uc_fix(*nodriver module*)
+def uc_fix(uc: uc):
+    uc.core.connection.Listener.listener_loop = listener_loop
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -377,13 +476,12 @@ async def main(data, reload_time, username=None, password=None, proxy=None, open
             matches = [match[0] for match in data]
             try:
                 buy_button = await custom_wait(page, "a.btn-main", timeout=2)
-                if not buy_button: continue
-                await buy_button.mouse_click()
+                if buy_button:
+                    await buy_button.mouse_click()
             except Exception as e: print(e)
             try: 
                 inner_button = await custom_wait(page, 'span[class="button action_buttons_0"]', timeout=2)
-                if not inner_button: pass
-                else:
+                if inner_button: 
                     await inner_button.mouse_move()
                     await inner_button.mouse_click()
             except Exception as e: print(e)
@@ -715,6 +813,7 @@ if __name__ == '__main__':
                 print(adspower_link)
 
             data, username, password, proxy, reload_time = gather_inputs()
+            uc_fix(nodriver)
             uc.loop().run_until_complete(main(data, reload_time, username, password, proxy, open_url=adspower_link))
         else:
             print('Введіть 1 з запропонованих варіантів [ yes / no ]')
